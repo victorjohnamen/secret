@@ -5,7 +5,9 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption");
+const md5 = require("md5")
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 const app = express();
 
@@ -16,8 +18,8 @@ const userSchema = new mongoose.Schema({
   password:{type:String, required:true}
 });
 //encryption of password
-console.log(process.env.SECRET);
-userSchema.plugin(encrypt,{secret: process.env.SECRET, encryptedFields:["password"] });
+
+
 
 const User = new mongoose.model("User",userSchema);
 
@@ -39,16 +41,20 @@ app.route("/login")
 .post(function(req,res){
   const username = req.body.username;
   const password = req.body.password;
+
+
   User.findOne({email:username},function(err,result){
     if(err){ //checking if theres error in finding the user
       console.log(err);
     }else{   //if no errors in finding the user
       if(result){       //check if theres a result
-        if(result.password == password){  //check if the password is equal.
-          res.render("secrets");
-        }else{
-          console.log("password does not match");
-        }
+        bcrypt.compare(password,result.password,function(err,result){
+          if(result === true){
+            res.render("secrets");
+          }else{
+            console.log("password does not match");
+          }
+        });
       }else{       //condition if no users found
         console.log("No data found");
       }
@@ -61,19 +67,22 @@ app.route("/register")
   res.render("register");
 })
 .post(function(req,res){
+  bcrypt.hash(req.body.password,saltRounds,function(err, hash){
+    const newUser = new User({
+      email: req.body.username,
+      password: hash
+    });
 
-  const newUser = new User({
-    email: req.body.username,
-    password: req.body.password
+    newUser.save(function(err){ //save the new user
+      if(err){
+        console.log(err);
+      }else{
+        res.render("secrets");
+      }
+    });
+
   });
 
-  newUser.save(function(err){ //save the new user
-    if(err){
-      console.log(err);
-    }else{
-      res.render("secrets");
-    }
-  });
 
 });
 
